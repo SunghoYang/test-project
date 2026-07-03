@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>고객 데이터 대시보드</title>
+<style>
+  :root {
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --series-1:       #2a78d6;
+    --series-1-wash:  rgba(42, 120, 214, 0.10);
+    --border:         rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --series-1:       #3987e5;
+      --series-1-wash:  rgba(57, 135, 229, 0.14);
+      --border:         rgba(255,255,255,0.10);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { padding: 24px 20px 64px; }
+  .dashboard { max-width: 1180px; margin: 0 auto; }
+
+  header h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  header p { font-size: 13px; color: var(--text-secondary); margin: 0 0 20px; }
+
+  section { margin-bottom: 24px; }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  h2.card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 14px;
+  }
+  h2.card-title .sub {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-left: 6px;
+  }
+
+  /* Filters */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .filters label { font-size: 12px; color: var(--text-secondary); margin-right: 6px; }
+  .filters select, .filters input[type="search"] {
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--page);
+    color: var(--text-primary);
+  }
+  .filters input[type="search"] { min-width: 220px; }
+  .filters .field { display: flex; align-items: center; }
+  .filters button {
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .filters button:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  .filters .count { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+  /* KPI */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .stat-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat-tile .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+  .stat-tile .value { font-size: 26px; font-weight: 600; line-height: 1.15; }
+  .stat-tile .value small { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+  .stat-tile .foot { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+  /* Charts */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 860px) { .charts-grid { grid-template-columns: 1fr; } }
+
+  .bar-list { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 64px 1fr 92px;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 4px;
+    border-radius: 6px;
+  }
+  .bar-row:hover, .bar-row:focus-visible { background: var(--series-1-wash); outline: none; }
+  .bar-row .bar-label {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-row .bar-track {
+    position: relative;
+    height: 20px;
+    background: var(--gridline);
+    border-radius: 4px;
+  }
+  .bar-row .bar-fill {
+    position: absolute;
+    top: 0; left: 0; height: 100%;
+    background: var(--series-1);
+    border-radius: 0 4px 4px 0;
+    min-width: 3px;
+    transition: width 0.25s ease;
+  }
+  .bar-row .bar-value {
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  .trend-svg { width: 100%; height: auto; display: block; }
+  .trend-axis text { font-size: 10px; fill: var(--text-muted); }
+  .trend-grid line { stroke: var(--gridline); stroke-width: 1; }
+  .trend-line { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .trend-dot { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+  .trend-hit { fill: transparent; cursor: pointer; }
+
+  /* Tooltip */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--text-primary);
+    color: var(--page);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    line-height: 1.4;
+    z-index: 50;
+    opacity: 0;
+    transform: translate(-50%, -100%);
+    transition: opacity 0.1s ease;
+    white-space: nowrap;
+  }
+  #tooltip.show { opacity: 1; }
+  #tooltip .t-value { font-weight: 600; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  thead th {
+    position: sticky; top: 0;
+    background: var(--surface-1);
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  thead th:hover { color: var(--text-primary); }
+  thead th.num, td.num { text-align: right; }
+  thead th .arrow { margin-left: 4px; color: var(--text-muted); }
+  thead th.sorted .arrow { color: var(--series-1); }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--gridline); white-space: nowrap; color: var(--text-primary); }
+  tbody tr:nth-child(even) td { background: var(--page); }
+  tbody tr:hover td { background: var(--series-1-wash); }
+  .empty-row td { text-align: center; color: var(--text-muted); padding: 24px; }
+</style>
+</head>
+<body>
+<div class="dashboard">
+  <header>
+    <h1>고객 데이터 대시보드</h1>
+    <p>customer.csv 기반 · 총 40명의 고객 데이터</p>
+  </header>
+
+  <section class="card filters">
+    <div class="field">
+      <label for="f-search">검색</label>
+      <input type="search" id="f-search" placeholder="이름, 이메일, 고객ID">
+    </div>
+    <div class="field">
+      <label for="f-region">지역</label>
+      <select id="f-region"><option value="">전체</option></select>
+    </div>
+    <div class="field">
+      <label for="f-age">연령대</label>
+      <select id="f-age"><option value="">전체</option></select>
+    </div>
+    <div class="field">
+      <label for="f-category">선호카테고리</label>
+      <select id="f-category"><option value="">전체</option></select>
+    </div>
+    <button id="f-reset" type="button">필터 초기화</button>
+    <span class="count" id="f-count"></span>
+  </section>
+
+  <section class="kpi-row" id="kpi-row"></section>
+
+  <section class="charts-grid">
+    <div class="card">
+      <h2 class="card-title">지역별 고객 수 <span class="sub">고객 수 기준 내림차순</span></h2>
+      <div class="bar-list" id="chart-region"></div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">연령대별 총 매출 <span class="sub">20대 → 50대</span></h2>
+      <div class="bar-list" id="chart-age"></div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">선호카테고리별 총 매출 <span class="sub">매출 기준 내림차순</span></h2>
+      <div class="bar-list" id="chart-category"></div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">월별 신규 가입자 추이 <span class="sub">가입일 기준</span></h2>
+      <svg class="trend-svg" id="chart-trend" viewBox="0 0 560 220" preserveAspectRatio="xMinYMin meet"></svg>
+    </div>
+  </section>
+
+  <section class="card" style="padding:0;">
+    <div style="padding:18px 20px 0;">
+      <h2 class="card-title">고객 상세 데이터</h2>
+    </div>
+    <div class="table-wrap">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th data-key="고객ID">고객ID</th>
+            <th data-key="이름">이름</th>
+            <th data-key="이메일">이메일</th>
+            <th data-key="가입일">가입일</th>
+            <th data-key="지역">지역</th>
+            <th data-key="연령대">연령대</th>
+            <th data-key="선호카테고리">선호카테고리</th>
+            <th data-key="구매횟수" class="num">구매횟수</th>
+            <th data-key="총구매액" class="num">총구매액</th>
+            <th data-key="마지막구매일">마지막구매일</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // 이름/이메일은 개인정보 보호를 위해 마스킹 처리됨 (이름 첫 글자, 이메일 앞 2글자만 노출)
+  var CSV_DATA = "고객ID,이름,이메일,가입일,지역,연령대,선호카테고리,구매횟수,총구매액,마지막구매일\n" +
+"C001,김**,mi***@example.com,2024-03-15,서울,30대,디지털,12,1840000,2026-04-22\n" +
+"C002,이**,se***@example.com,2024-05-22,경기,20대,화장품,28,2350000,2026-04-30\n" +
+"C003,박**,ji***@example.com,2024-01-08,부산,40대,가전,5,3200000,2026-03-18\n" +
+"C004,최**,su***@example.com,2024-08-11,서울,30대,의류,34,1890000,2026-04-28\n" +
+"C005,정**,wo***@example.com,2024-02-19,인천,50대,도서,8,420000,2026-02-05\n" +
+"C006,강**,ha***@example.com,2024-11-03,대구,20대,화장품,22,1670000,2026-04-19\n" +
+"C007,조**,hy***@example.com,2024-04-27,서울,40대,운동용품,15,2100000,2026-04-12\n" +
+"C008,윤**,ji***@example.com,2024-06-14,경기,30대,유아용품,41,3450000,2026-04-29\n" +
+"C009,장**,do***@example.com,2025-01-20,광주,30대,디지털,9,1520000,2026-03-25\n" +
+"C010,임**,ch***@example.com,2024-09-08,서울,20대,의류,18,980000,2026-04-15\n" +
+"C011,한**,ji***@example.com,2024-07-30,대전,40대,가전,3,2780000,2026-01-22\n" +
+"C012,오**,se***@example.com,2024-10-12,경기,30대,식품,52,1230000,2026-04-30\n" +
+"C013,서**,mi***@example.com,2025-02-05,서울,20대,운동용품,11,890000,2026-04-08\n" +
+"C014,신**,ye***@example.com,2024-12-18,울산,30대,화장품,26,2010000,2026-04-21\n" +
+"C015,권**,si***@example.com,2024-03-25,서울,50대,도서,14,680000,2026-03-30\n" +
+"C016,황**,so***@example.com,2025-03-11,경기,20대,유아용품,7,1340000,2026-04-02\n" +
+"C017,안**,ji***@example.com,2024-05-09,부산,40대,가구,4,4200000,2026-02-14\n" +
+"C018,송**,ha***@example.com,2024-08-22,서울,30대,디지털,19,2890000,2026-04-26\n" +
+"C019,류**,se***@example.com,2024-11-16,인천,20대,의류,23,1450000,2026-04-18\n" +
+"C020,홍**,mi***@example.com,2024-04-03,대구,40대,식품,38,1780000,2026-04-29\n" +
+"C021,전**,yu***@example.com,2025-01-07,서울,30대,화장품,17,1340000,2026-04-11\n" +
+"C022,고**,ji***@example.com,2024-06-28,경기,20대,운동용품,13,720000,2026-03-20\n" +
+"C023,문**,se***@example.com,2024-09-15,광주,40대,가전,2,1980000,2025-12-08\n" +
+"C024,양**,ch***@example.com,2024-12-04,서울,30대,유아용품,29,2540000,2026-04-27\n" +
+"C025,배**,do***@example.com,2024-02-26,대전,50대,도서,11,520000,2026-03-15\n" +
+"C026,백**,se***@example.com,2025-02-19,경기,20대,의류,16,1080000,2026-04-14\n" +
+"C027,남**,ji***@example.com,2024-07-11,서울,30대,디지털,21,2670000,2026-04-23\n" +
+"C028,심**,ha***@example.com,2024-10-28,울산,20대,화장품,19,1560000,2026-04-09\n" +
+"C029,노**,gu***@example.com,2024-03-08,서울,40대,운동용품,8,1240000,2026-02-28\n" +
+"C030,허**,yu***@example.com,2025-03-22,부산,30대,식품,33,1410000,2026-04-30\n" +
+"C031,유**,si***@example.com,2024-05-31,서울,20대,의류,25,1620000,2026-04-25\n" +
+"C032,진**,ye***@example.com,2024-08-19,인천,40대,가구,3,3680000,2026-01-30\n" +
+"C033,진**,se***@example.com,2024-11-25,대구,30대,화장품,20,1490000,2026-04-17\n" +
+"C034,민**,do***@example.com,2025-01-13,서울,20대,디지털,14,1980000,2026-04-06\n" +
+"C035,석**,ji***@example.com,2024-04-17,경기,40대,유아용품,36,3120000,2026-04-29\n" +
+"C036,차**,ye***@example.com,2024-06-09,광주,30대,운동용품,12,860000,2026-03-28\n" +
+"C037,우**,mi***@example.com,2024-09-26,서울,50대,도서,9,470000,2026-03-10\n" +
+"C038,구**,ha***@example.com,2024-12-15,경기,20대,의류,21,1340000,2026-04-20\n" +
+"C039,라**,se***@example.com,2025-02-28,부산,30대,식품,28,1280000,2026-04-26\n" +
+"C040,설**,ch***@example.com,2024-07-22,서울,20대,화장품,24,1850000,2026-04-24";
+
+  function parseCSV(text) {
+    var lines = text.split("\n");
+    var headers = lines[0].split(",");
+    return lines.slice(1).map(function (line) {
+      var cols = line.split(",");
+      var row = {};
+      headers.forEach(function (h, i) { row[h] = cols[i]; });
+      row["구매횟수"] = Number(row["구매횟수"]);
+      row["총구매액"] = Number(row["총구매액"]);
+      return row;
+    });
+  }
+
+  var ALL_DATA = parseCSV(CSV_DATA);
+  var AGE_ORDER = ["20대", "30대", "40대", "50대"];
+
+  function fmtWon(n) { return "₩" + Math.round(n).toLocaleString("ko-KR"); }
+  function fmtNum(n) { return n.toLocaleString("ko-KR"); }
+  function uniqueSorted(arr) {
+    var seen = {};
+    var out = [];
+    arr.forEach(function (v) { if (!seen[v]) { seen[v] = true; out.push(v); } });
+    out.sort(function (a, b) { return a.localeCompare(b, "ko"); });
+    return out;
+  }
+
+  // ---- reference date for recency KPI: fixed, derived once from the full dataset ----
+  var REF_DATE = ALL_DATA.reduce(function (max, r) {
+    return r["마지막구매일"] > max ? r["마지막구매일"] : max;
+  }, "0000-00-00");
+
+  function daysBetween(a, b) {
+    return (new Date(b) - new Date(a)) / 86400000;
+  }
+
+  // ---- state ----
+  var state = { search: "", region: "", age: "", category: "" };
+  var sortState = { key: "고객ID", dir: "asc" };
+
+  // ---- populate filter selects ----
+  function fillSelect(id, values) {
+    var sel = document.getElementById(id);
+    values.forEach(function (v) {
+      var opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    });
+  }
+  fillSelect("f-region", uniqueSorted(ALL_DATA.map(function (r) { return r["지역"]; })));
+  fillSelect("f-age", AGE_ORDER);
+  fillSelect("f-category", uniqueSorted(ALL_DATA.map(function (r) { return r["선호카테고리"]; })));
+
+  function getFiltered() {
+    var q = state.search.trim().toLowerCase();
+    return ALL_DATA.filter(function (r) {
+      if (state.region && r["지역"] !== state.region) return false;
+      if (state.age && r["연령대"] !== state.age) return false;
+      if (state.category && r["선호카테고리"] !== state.category) return false;
+      if (q) {
+        var hay = (r["이름"] + " " + r["이메일"] + " " + r["고객ID"]).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  // ---- tooltip ----
+  var tooltipEl = document.getElementById("tooltip");
+  function showTooltip(x, y, html) {
+    tooltipEl.innerHTML = html;
+    tooltipEl.style.left = x + "px";
+    tooltipEl.style.top = (y - 10) + "px";
+    tooltipEl.classList.add("show");
+  }
+  function hideTooltip() { tooltipEl.classList.remove("show"); }
+
+  // ---- KPI ----
+  function renderKPIs(data) {
+    var el = document.getElementById("kpi-row");
+    var totalRevenue = data.reduce(function (s, r) { return s + r["총구매액"]; }, 0);
+    var avgRevenue = data.length ? totalRevenue / data.length : 0;
+    var avgCount = data.length ? data.reduce(function (s, r) { return s + r["구매횟수"]; }, 0) / data.length : 0;
+    var active90 = data.filter(function (r) { return daysBetween(r["마지막구매일"], REF_DATE) <= 90; }).length;
+
+    var tiles = [
+      { label: "총 고객 수", value: fmtNum(data.length) + "<small>명</small>" },
+      { label: "총 매출액", value: fmtWon(totalRevenue) },
+      { label: "평균 구매액", value: fmtWon(avgRevenue) },
+      { label: "평균 구매 횟수", value: avgCount.toFixed(1) + "<small>회</small>" },
+      { label: "최근 90일 활성 고객", value: fmtNum(active90) + "<small>명</small>", foot: "기준일 " + REF_DATE }
+    ];
+    el.innerHTML = tiles.map(function (t) {
+      return '<div class="stat-tile"><div class="label">' + t.label + '</div>' +
+        '<div class="value">' + t.value + '</div>' +
+        (t.foot ? '<div class="foot">' + t.foot + '</div>' : "") +
+        '</div>';
+    }).join("");
+  }
+
+  // ---- bar chart (HTML-based, single sequential hue) ----
+  function renderBarChart(containerId, items, opts) {
+    var el = document.getElementById(containerId);
+    el.innerHTML = "";
+    var max = Math.max.apply(null, items.map(function (i) { return i.value; }).concat([1]));
+    var total = items.reduce(function (s, i) { return s + i.value; }, 0);
+
+    if (!items.length) {
+      el.innerHTML = '<div style="font-size:12.5px;color:var(--text-muted);padding:8px 0;">표시할 데이터가 없습니다.</div>';
+      return;
+    }
+
+    items.forEach(function (item) {
+      var row = document.createElement("div");
+      row.className = "bar-row";
+      row.tabIndex = 0;
+
+      var label = document.createElement("div");
+      label.className = "bar-label";
+      label.textContent = item.label;
+
+      var track = document.createElement("div");
+      track.className = "bar-track";
+      var fill = document.createElement("div");
+      fill.className = "bar-fill";
+      fill.style.width = ((item.value / max) * 100).toFixed(1) + "%";
+      track.appendChild(fill);
+
+      var valueEl = document.createElement("div");
+      valueEl.className = "bar-value";
+      valueEl.textContent = opts.valueFmt(item.value);
+
+      row.appendChild(label);
+      row.appendChild(track);
+      row.appendChild(valueEl);
+
+      var pct = total ? ((item.value / total) * 100).toFixed(1) : "0.0";
+      function onEnter(e) {
+        var pos = row.getBoundingClientRect();
+        showTooltip(pos.left + pos.width / 2, pos.top, opts.tooltip(item, pct));
+      }
+      row.addEventListener("mouseenter", onEnter);
+      row.addEventListener("mousemove", onEnter);
+      row.addEventListener("mouseleave", hideTooltip);
+      row.addEventListener("focus", onEnter);
+      row.addEventListener("blur", hideTooltip);
+
+      el.appendChild(row);
+    });
+  }
+
+  function groupSum(data, key, valueKey) {
+    var map = {};
+    data.forEach(function (r) {
+      var k = r[key];
+      map[k] = (map[k] || 0) + (valueKey ? r[valueKey] : 1);
+    });
+    return map;
+  }
+
+  function renderRegionChart(data) {
+    var map = groupSum(data, "지역", null);
+    var items = Object.keys(map).map(function (k) { return { label: k, value: map[k] }; });
+    items.sort(function (a, b) { return b.value - a.value; });
+    renderBarChart("chart-region", items, {
+      valueFmt: function (v) { return fmtNum(v) + "명"; },
+      tooltip: function (item, pct) {
+        return '지역 · ' + item.label + '<br><span class="t-value">' + fmtNum(item.value) + '명</span> (' + pct + '%)';
+      }
+    });
+  }
+
+  function renderAgeChart(data) {
+    var map = groupSum(data, "연령대", "총구매액");
+    var items = AGE_ORDER.filter(function (k) { return map[k] !== undefined; })
+      .map(function (k) { return { label: k, value: map[k] }; });
+    renderBarChart("chart-age", items, {
+      valueFmt: function (v) { return fmtWon(v); },
+      tooltip: function (item, pct) {
+        return '연령대 · ' + item.label + '<br><span class="t-value">' + fmtWon(item.value) + '</span> (' + pct + '%)';
+      }
+    });
+  }
+
+  function renderCategoryChart(data) {
+    var map = groupSum(data, "선호카테고리", "총구매액");
+    var items = Object.keys(map).map(function (k) { return { label: k, value: map[k] }; });
+    items.sort(function (a, b) { return b.value - a.value; });
+    renderBarChart("chart-category", items, {
+      valueFmt: function (v) { return fmtWon(v); },
+      tooltip: function (item, pct) {
+        return '카테고리 · ' + item.label + '<br><span class="t-value">' + fmtWon(item.value) + '</span> (' + pct + '%)';
+      }
+    });
+  }
+
+  // ---- trend line chart (SVG) ----
+  function renderTrendChart(data) {
+    var svg = document.getElementById("chart-trend");
+    svg.innerHTML = "";
+    var svgNS = "http://www.w3.org/2000/svg";
+
+    if (!data.length) return;
+
+    var months = data.map(function (r) { return r["가입일"].slice(0, 7); });
+    var minM = months.reduce(function (a, b) { return b < a ? b : a; });
+    var maxM = months.reduce(function (a, b) { return b > a ? b : a; });
+
+    var seq = [];
+    var cursor = new Date(minM + "-01T00:00:00");
+    var end = new Date(maxM + "-01T00:00:00");
+    while (cursor <= end) {
+      var y = cursor.getFullYear();
+      var m = String(cursor.getMonth() + 1).padStart(2, "0");
+      seq.push(y + "-" + m);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    var counts = seq.map(function (m) {
+      return months.filter(function (mm) { return mm === m; }).length;
+    });
+
+    var W = 560, H = 220, padL = 34, padR = 14, padT = 14, padB = 34;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var maxCount = Math.max.apply(null, counts.concat([1]));
+    var niceMax = Math.max(4, Math.ceil(maxCount / 2) * 2);
+
+    function xAt(i) { return padL + (seq.length === 1 ? plotW / 2 : (i / (seq.length - 1)) * plotW); }
+    function yAt(v) { return padT + plotH - (v / niceMax) * plotH; }
+
+    // gridlines + y ticks
+    var ticks = 4;
+    for (var t = 0; t <= ticks; t++) {
+      var val = (niceMax / ticks) * t;
+      var y = yAt(val);
+      var line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", padL); line.setAttribute("x2", W - padR);
+      line.setAttribute("y1", y); line.setAttribute("y2", y);
+      line.setAttribute("stroke", "var(--gridline)"); line.setAttribute("stroke-width", "1");
+      svg.appendChild(line);
+
+      var label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", padL - 8); label.setAttribute("y", y + 3);
+      label.setAttribute("text-anchor", "end");
+      label.setAttribute("font-size", "10"); label.setAttribute("fill", "var(--text-muted)");
+      label.textContent = Math.round(val);
+      svg.appendChild(label);
+    }
+
+    // x labels (thin out if many months)
+    var labelStep = Math.ceil(seq.length / 8);
+    seq.forEach(function (m, i) {
+      if (i % labelStep !== 0 && i !== seq.length - 1) return;
+      var label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", xAt(i)); label.setAttribute("y", H - padB + 16);
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("font-size", "10"); label.setAttribute("fill", "var(--text-muted)");
+      label.textContent = m.slice(2);
+      svg.appendChild(label);
+    });
+
+    // line
+    var pathD = counts.map(function (c, i) { return (i === 0 ? "M" : "L") + xAt(i) + "," + yAt(c); }).join(" ");
+    var path = document.createElementNS(svgNS, "path");
+    path.setAttribute("d", pathD);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "var(--series-1)");
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-linejoin", "round");
+    path.setAttribute("stroke-linecap", "round");
+    svg.appendChild(path);
+
+    // dots + hit areas
+    counts.forEach(function (c, i) {
+      var cx = xAt(i), cy = yAt(c);
+      var dot = document.createElementNS(svgNS, "circle");
+      dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("r", "4");
+      dot.setAttribute("fill", "var(--series-1)");
+      dot.setAttribute("stroke", "var(--surface-1)"); dot.setAttribute("stroke-width", "2");
+      svg.appendChild(dot);
+
+      var hit = document.createElementNS(svgNS, "circle");
+      hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", "12");
+      hit.setAttribute("fill", "transparent");
+      hit.style.cursor = "pointer";
+      hit.addEventListener("mousemove", function (e) {
+        showTooltip(e.clientX, e.clientY, "가입월 · " + seq[i] + '<br><span class="t-value">' + c + '명</span>');
+      });
+      hit.addEventListener("mouseleave", hideTooltip);
+      svg.appendChild(hit);
+    });
+  }
+
+  // ---- table ----
+  function renderTable(data) {
+    var body = document.getElementById("table-body");
+    var sorted = data.slice().sort(function (a, b) {
+      var k = sortState.key, dir = sortState.dir === "asc" ? 1 : -1;
+      var va = a[k], vb = b[k];
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), "ko") * dir;
+    });
+
+    if (!sorted.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="10">조건에 맞는 고객이 없습니다.</td></tr>';
+    } else {
+      body.innerHTML = sorted.map(function (r) {
+        return "<tr>" +
+          "<td>" + r["고객ID"] + "</td>" +
+          "<td>" + r["이름"] + "</td>" +
+          "<td>" + r["이메일"] + "</td>" +
+          "<td>" + r["가입일"] + "</td>" +
+          "<td>" + r["지역"] + "</td>" +
+          "<td>" + r["연령대"] + "</td>" +
+          "<td>" + r["선호카테고리"] + "</td>" +
+          '<td class="num">' + fmtNum(r["구매횟수"]) + "</td>" +
+          '<td class="num">' + fmtWon(r["총구매액"]) + "</td>" +
+          "<td>" + r["마지막구매일"] + "</td>" +
+          "</tr>";
+      }).join("");
+    }
+
+    document.querySelectorAll("thead th").forEach(function (th) {
+      th.classList.toggle("sorted", th.dataset.key === sortState.key);
+      var existing = th.querySelector(".arrow");
+      if (existing) existing.remove();
+      if (th.dataset.key === sortState.key) {
+        var arrow = document.createElement("span");
+        arrow.className = "arrow";
+        arrow.textContent = sortState.dir === "asc" ? "▲" : "▼";
+        th.appendChild(arrow);
+      }
+    });
+  }
+
+  document.querySelectorAll("thead th").forEach(function (th) {
+    th.addEventListener("click", function () {
+      var key = th.dataset.key;
+      if (sortState.key === key) {
+        sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+      } else {
+        sortState.key = key;
+        sortState.dir = "asc";
+      }
+      renderTable(getFiltered());
+    });
+  });
+
+  // ---- wire up filters ----
+  function updateAll() {
+    var filtered = getFiltered();
+    document.getElementById("f-count").textContent = "총 " + fmtNum(ALL_DATA.length) + "명 중 " + fmtNum(filtered.length) + "명 표시";
+    renderKPIs(filtered);
+    renderRegionChart(filtered);
+    renderAgeChart(filtered);
+    renderCategoryChart(filtered);
+    renderTrendChart(filtered);
+    renderTable(filtered);
+  }
+
+  document.getElementById("f-search").addEventListener("input", function (e) { state.search = e.target.value; updateAll(); });
+  document.getElementById("f-region").addEventListener("change", function (e) { state.region = e.target.value; updateAll(); });
+  document.getElementById("f-age").addEventListener("change", function (e) { state.age = e.target.value; updateAll(); });
+  document.getElementById("f-category").addEventListener("change", function (e) { state.category = e.target.value; updateAll(); });
+  document.getElementById("f-reset").addEventListener("click", function () {
+    state = { search: "", region: "", age: "", category: "" };
+    document.getElementById("f-search").value = "";
+    document.getElementById("f-region").value = "";
+    document.getElementById("f-age").value = "";
+    document.getElementById("f-category").value = "";
+    updateAll();
+  });
+
+  updateAll();
+})();
+</script>
+</body>
+</html>
